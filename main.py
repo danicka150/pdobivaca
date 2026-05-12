@@ -21,11 +21,11 @@ HTML = """
 <html>
 <head>
 <meta charset="utf-8">
-<title>OSINT Search</title>
+<title>OSINT</title>
 
 <style>
 body{
-    background:#0f0f0f;
+    background:#111;
     color:white;
     font-family:Arial;
     padding:30px;
@@ -36,9 +36,9 @@ input{
     padding:14px;
     border:none;
     border-radius:12px;
-    font-size:18px;
     background:#1f1f1f;
     color:white;
+    font-size:18px;
 }
 
 button{
@@ -52,26 +52,21 @@ button{
 }
 
 .card{
-    background:#1a1a1a;
+    background:#1b1b1b;
     margin-top:20px;
     padding:20px;
     border-radius:15px;
 }
 
-a{
-    color:#66ccff;
-    text-decoration:none;
-}
-
-h1,h2,h3{
-    margin-top:0;
+.line{
+    margin:10px 0;
 }
 </style>
 </head>
 
 <body>
 
-<h1>Phone / Username OSINT</h1>
+<h1>OSINT SEARCH</h1>
 
 <input id="query" placeholder="+7705... or username">
 <button onclick="search()">Search</button>
@@ -86,42 +81,40 @@ async function search(){
     let res = await fetch("/api/search?q=" + encodeURIComponent(query));
     let data = await res.json();
 
-    let html = "";
-
-    html += `
-    <div class="card">
-    <h2>Result</h2>
-    `;
+    let html = `<div class="card">`;
 
     if(data.phone.valid){
 
         html += `
-        <p><b>Phone:</b> ${data.phone.input}</p>
-        <p><b>Country:</b> ${data.phone.country}</p>
-        <p><b>Operator:</b> ${data.phone.operator}</p>
+        <div class="line"><b>PHONE:</b> ${data.phone.input}</div>
+        <div class="line"><b>COUNTRY:</b> ${data.phone.country}</div>
+        <div class="line"><b>OPERATOR:</b> ${data.phone.operator}</div>
+        <div class="line"><b>FORMAT:</b> ${data.phone.format}</div>
         `;
     }
 
     if(data.username){
 
         html += `
-        <p><b>Username:</b> ${data.username}</p>
+        <div class="line"><b>USERNAME:</b> ${data.username}</div>
         `;
     }
 
-    html += "<h3>Public Search</h3>";
+    if(data.accounts.length > 0){
 
-    data.links.forEach(link => {
-        html += `
-        <p>
-            <a href="${link.url}" target="_blank">
-                ${link.name}
-            </a>
-        </p>
-        `;
-    });
+        html += `<h3>ACCOUNTS</h3>`;
 
-    html += "</div>";
+        data.accounts.forEach(acc => {
+
+            html += `
+            <div class="line">
+            ${acc.site}: ${acc.url}
+            </div>
+            `;
+        });
+    }
+
+    html += `</div>`;
 
     document.getElementById("result").innerHTML = html;
 }
@@ -140,13 +133,14 @@ async def search(q: str):
 
     result = {
         "phone": {
-            "input": q,
             "valid": False,
-            "country": None,
-            "operator": None
+            "input": q,
+            "country": "",
+            "operator": "",
+            "format": ""
         },
         "username": None,
-        "links": []
+        "accounts": []
     }
 
     # PHONE INFO
@@ -168,39 +162,26 @@ async def search(q: str):
                 "en"
             )
 
-            normalized = phonenumbers.format_number(
+            result["phone"]["format"] = phonenumbers.format_number(
                 parsed,
-                phonenumbers.PhoneNumberFormat.E164
+                phonenumbers.PhoneNumberFormat.INTERNATIONAL
             )
-
-            phone_queries = [
-                ("Google Exact", f'https://google.com/search?q="{normalized}"'),
-                ("Yandex Search", f'https://yandex.ru/search/?text="{normalized}"'),
-                ("Telegram Search", f'https://t.me/{normalized.replace("+","")}'),
-                ("WhatsApp Check", f'https://wa.me/{normalized.replace("+","")}'),
-            ]
-
-            for name, url in phone_queries:
-                result["links"].append({
-                    "name": name,
-                    "url": url
-                })
 
     except:
         pass
 
-    # USERNAME SEARCH
+    # USERNAME
     username = re.sub(r'[^a-zA-Z0-9_.]', '', q)
 
     if len(username) >= 3:
 
         result["username"] = username
 
-        username_sites = [
+        sites = [
             ("Instagram", f"https://instagram.com/{username}"),
             ("TikTok", f"https://tiktok.com/@{username}"),
-            ("GitHub", f"https://github.com/{username}"),
             ("Telegram", f"https://t.me/{username}"),
+            ("GitHub", f"https://github.com/{username}"),
             ("YouTube", f"https://youtube.com/@{username}"),
             ("Twitter/X", f"https://x.com/{username}"),
             ("Reddit", f"https://reddit.com/user/{username}"),
@@ -209,10 +190,10 @@ async def search(q: str):
             ("Steam", f"https://steamcommunity.com/id/{username}")
         ]
 
-        for name, url in username_sites:
+        for site, url in sites:
 
-            result["links"].append({
-                "name": name,
+            result["accounts"].append({
+                "site": site,
                 "url": url
             })
 
